@@ -12,23 +12,22 @@ public class MoveSphereScript : MonoBehaviour
     void Start()
     {
         this.sphereRigidBody = GetComponent<Rigidbody>();
-        this.sphereRigidBody.freezeRotation = true;
     }
 
     // Update is called once per frame
     void FixedUpdate()
     {
       if(Input.GetKey(KeyCode.W)){
-    	 this.sphereRigidBody.AddForce((transform.forward * movimientoVertical) * fuerza);
+    	 this.sphereRigidBody.AddForce(Vector3.forward * fuerza);
       }
       else if(Input.GetKey(KeyCode.S)){
-    	 this.sphereRigidBody.AddForce((transform.forward * -movimientoVertical) * fuerza);
+    	 this.sphereRigidBody.AddForce(Vector3.back * fuerza);
       }
       else if(Input.GetKey(KeyCode.A)){
-    	 this.sphereRigidBody.AddForce((transform.right * -movimientoVertical) * fuerza);
+    	 this.sphereRigidBody.AddForce(Vector3.left * fuerza);
       }
       else if(Input.GetKey(KeyCode.D)){
-    	 this.sphereRigidBody.AddForce((transform.right * movimientoVertical) * fuerza);
+    	 this.sphereRigidBody.AddForce(Vector3.right * fuerza);
       }
       else{
          Debug.Log("No-Key pressed");
