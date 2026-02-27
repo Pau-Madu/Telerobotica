@@ -1,0 +1,90 @@
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Twist
+from std_msgs.msg import Float32
+import matplotlib.pyplot as plt
+import numpy as np
+
+class HeatmapNode(Node):
+    def __init__(self):
+        super().__init__('heatmap_node')
+        
+        # Suscripciones
+        self.sub_vel = self.create_subscription(Twist, '/cmd_vel', self.vel_callback, 10)
+        self.sub_light = self.create_subscription(Float32, '/light_sensor', self.light_callback, 10)
+        
+        # Variables de odometría
+        self.x, self.y, self.theta = 0.0, 0.0, 0.0
+        self.last_time = self.get_clock().now()
+        
+        # Almacenamiento de datos
+        self.data_x = []
+        self.data_y = []
+        self.data_light = []
+
+        # Configuración de Matplotlib interactivo
+        plt.ion() 
+        self.fig, self.ax = plt.subplots(figsize=(10, 7))
+        self.scatter = None
+        self.cbar = None
+        
+        self.get_logger().info('Nodo Heatmap Calibrado (0-200 Lux) iniciado')
+
+    def vel_callback(self, msg):
+        now = self.get_clock().now()
+        dt = (now - self.last_time).nanoseconds / 1e9
+        self.last_time = now
+        
+        # Estimación de trayectoria
+        v = msg.linear.x
+        w = msg.angular.z
+        self.x += v * np.cos(self.theta) * dt
+        self.y += v * np.sin(self.theta) * dt
+        self.theta += w * dt
+
+    def light_callback(self, msg):
+        self.data_x.append(self.x)
+        self.data_y.append(self.y)
+        self.data_light.append(msg.data)
+        self.update_plot()
+
+    def update_plot(self):
+        self.ax.clear()
+        
+        self.ax.set_title("Mapa de Calor: Intensidad Lumínica Real")
+        self.ax.set_xlabel("X (metros)")
+        self.ax.set_ylabel("Y (metros)")
+        self.ax.grid(True, linestyle='--', alpha=0.6)
+
+        # AJUSTE DE ESCALA: vmin=0 y vmax=200
+        # Puntos más pequeños: s=80
+        sc = self.ax.scatter(self.data_x, self.data_y, c=self.data_light, 
+                             cmap='jet', vmin=0, vmax=200, s=80, alpha=0.8)
+        
+        if self.cbar is None:
+            self.cbar = self.fig.colorbar(sc, ax=self.ax)
+            self.cbar.set_label('Luz (Lux)')
+        else:
+            self.cbar.mappable.set_clim(0, 200)
+
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+
+def main():
+    rclpy.init()
+    node = HeatmapNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        plt.ioff()
+        # Al cerrar, guardamos la imagen automáticamente para tu informe
+        plt.savefig('mapa_calor_final.png')
+        print("Mapa guardado como 'mapa_calor_final.png'")
+        plt.show()
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
