@@ -7,12 +7,17 @@ public class RosTeleopDualControl : MonoBehaviour
     ROSConnection ros;
     public string topicName = "/cmd_vel";
 
-    [Header("Configuración de Velocidad")]
-    public float linearSpeed = 0.2f;    // Velocidad lineal (m/s)
-    public float angularSpeed = 0.5f;   // Velocidad angular (rad/s)
+    [Header("Límites de Velocidad")]
+    public float maxLinearLimit = 0.2f;  // Máximo que puede alcanzar
+    public float maxAngularLimit = 0.5f;
+    
+    [Header("Estado Actual (Crucero)")]
+    public float currentLinearSpeed = 0.15f;  // Se ajusta con R2/L2
+    public float currentAngularSpeed = 0.3f;
 
-    [Header("Referencia a la Cámara")]
+    [Header("Referencias")]
     public Camera_script cameraScript; 
+    public Transform robotReferencia; 
 
     void Start()
     {
@@ -22,30 +27,53 @@ public class RosTeleopDualControl : MonoBehaviour
 
     void Update()
     {
-        // 1. CONTROL DE CÁMARA (Opcional, se mantiene por si usas el botón)
-        if (Input.GetKeyDown(KeyCode.JoystickButton0))
+        // 1. AJUSTE DE VELOCIDAD CON GATILLOS (R2 aumenta, L2 disminuye)
+        // Usamos GetKeyDown o una pulsación mantenida suave
+        if (Input.GetKey(KeyCode.JoystickButton5) || Input.GetKey(KeyCode.E)) // R2 Augmenta la velocidad
         {
-            if (cameraScript != null) cameraScript.ToggleCamera();
+            currentLinearSpeed = Mathf.Clamp(currentLinearSpeed + 0.01f, 0, maxLinearLimit);
+        }
+        if (Input.GetKey(KeyCode.JoystickButton4) || Input.GetKey(KeyCode.Q)) // L2 Disminuye la velocidad
+        {
+            currentLinearSpeed = Mathf.Clamp(currentLinearSpeed - 0.01f, 0, maxLinearLimit);
         }
 
-        // 2. OBTENCIÓN DE ENTRADAS DIGITALES (Teclado)
-        float finalForward = 0;
-        float finalTurn = 0;
+        // 2. LECTURA ANALÓGICA DEL JOYSTICK (La "puntuación")
+        // GetAxis devuelve un valor de -1.0 a 1.0 dependiendo de cuánto inclines el palo
+        float joyVertical = Input.GetAxis("Vertical");
+        float joyHorizontal = Input.GetAxis("Horizontal");
 
-        // Movimiento Lineal
-        if (Input.GetKey(KeyCode.W)) finalForward = linearSpeed;
-        else if (Input.GetKey(KeyCode.S)) finalForward = -linearSpeed;
+        float move = 0f;
+        float turn = 0f;
 
-        // Movimiento Angular
-        if (Input.GetKey(KeyCode.A)) finalTurn = angularSpeed;
-        else if (Input.GetKey(KeyCode.D)) finalTurn = -angularSpeed;
+        // Mezcla de teclado (para emergencias)
+        if (Input.GetKey(KeyCode.W)) move = 1f;
+        else if (Input.GetKey(KeyCode.S)) move = -1f;
+        if (Input.GetKey(KeyCode.A)) turn = 1f;
+        else if (Input.GetKey(KeyCode.D)) turn = -1f;
 
-        // 3. PUBLICACIÓN DEL MENSAJE TWIST
-        // Directamente enviamos los valores obtenidos del teclado
+        // Si no hay teclado, usamos la "puntuación" del Joystick
+        if (move == 0) move = joyVertical;
+        if (turn == 0) turn = -joyHorizontal;
+
+        // 3. CÁLCULO FINAL (Velocidad Proporcional)
+        // Aquí es donde la IA/Mando brilla: si mueves el joystick solo un poco, 
+        // el robot se mueve a un % de la velocidad de crucero.
+        float finalForward = move * currentLinearSpeed;
+        float finalTurn = turn * currentAngularSpeed;
+
+        // 4. MOVIMIENTO DE REFERENCIA (Unity)
+        if (robotReferencia != null)
+        {
+            float dt = Time.deltaTime;
+            robotReferencia.Rotate(0, -finalTurn * Mathf.Rad2Deg * dt, 0);
+            robotReferencia.Translate(Vector3.forward * finalForward * dt);
+        }
+
+        // 5. PUBLICAR A ROS
         TwistMsg cmdVel = new TwistMsg();
         cmdVel.linear.x = finalForward;
         cmdVel.angular.z = finalTurn;
-
         ros.Publish(topicName, cmdVel);
     }
 }

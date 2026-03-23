@@ -37,6 +37,8 @@ public class Camera_script : MonoBehaviour
     private float lastSimTime = 0f;
     private float timeoutThreshold = 2.0f; 
 
+    public Slider zoomSlider; //Para tener el slider del Zoom
+
     void Start()
     {
         rectTransform = viewportDisplay.GetComponent<RectTransform>();  //Ponemos el Display de las imagenes
@@ -65,6 +67,8 @@ public class Camera_script : MonoBehaviour
         lastSimTime = Time.time; 
         totalBytesInSecond += msg.data.Length;         // Sumamos los bytes para el cálculo de Bitrate
     }
+    
+
 
     void Update()
     {
@@ -140,5 +144,26 @@ public class Camera_script : MonoBehaviour
         if (rectTransform == null) return;
         // Reindexado: Asegura que la orientación sea natural para el operador (Tema 2.3)
         rectTransform.localRotation = showingRealCamera ? Quaternion.Euler(0, 0, 180) : Quaternion.Euler(0, 0, 0);
+    }
+    
+    public void SetZoom(float zoomValue)
+    {
+        // 1. Seguridad: Evitamos valores menores a 1 que rompen la vista
+        if (zoomValue < 1f) zoomValue = 1f;
+
+        // 2. Verificamos que la imagen exista antes de tocarla
+        if (viewportDisplay != null)
+        {
+            float size = 1.0f / zoomValue;
+            float offset = (1.0f - size) / 2.0f;
+
+            // Aplicamos el recorte
+            viewportDisplay.uvRect = new Rect(offset, offset, size, size);
+            Debug.Log($"Zoom aplicado: {zoomValue}x | Size: {size}");
+        }
+        else 
+        {
+            Debug.LogError("¡Error! No has arrastrado la RawImage al script de la cámara.");
+        }
     }
 }
