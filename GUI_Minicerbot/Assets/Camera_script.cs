@@ -7,163 +7,126 @@ using TMPro;
 public class Camera_script : MonoBehaviour
 {
     [Header("Configuración de Interfaz")]
-    public RawImage viewportDisplay;      // El bloque de Visualizacion de Imagenes se almacena en esta Variable
-    public Button changeButton;           // El bloque de Boton para intercambiar las imagenes se almacena en esta Variable
-    private RectTransform rectTransform;
+    public RawImage mainDisplay;      
+    public RawImage secondaryDisplay; 
+    public Button changeButton;       // Botón azul "CAMERA"
 
-    [Header("HUD - Telepropiocepción")]    // Los bloques de Texto se almacenan en estas Variables
+    [Header("HUD - Telepropiocepción")]
     public TextMeshProUGUI fpsText;
     public TextMeshProUGUI latencyText;
     public TextMeshProUGUI bitrateText;
-    public TextMeshProUGUI posText;
 
-    // Variables para cálculo de FPS y Bitrate
+    [Header("Control de Zoom")]
+    public Slider zoomSlider;
+
+    private Texture2D textureReal, textureReal2, textureSim;
+    private byte[] dataReal, dataReal2, dataSim;
+    private bool isRealUpdated, isReal2Updated, isSimUpdated;
+
+    [Header("Estado de la Lógica")]
+    public bool modoSimulacionActivo = false; 
+    public bool verMovil1EnGrande = true;     
+
+    private float lastRealTime, lastReal2Time, lastSimTime;
+    private float timeoutThreshold = 2.0f;
     private int frameCount = 0;
     private long totalBytesInSecond = 0;
     private float nextUpdate = 0.0f;
 
-    // Variables de datos (Telepresencia)
-    private Texture2D textureReal;
-    private Texture2D textureSim;
-    private byte[] dataReal;
-    private byte[] dataSim;
-    private bool isRealUpdated;
-    private bool isSimUpdated;
-
-    public bool showingRealCamera = true; //Por defecto esta activa la Camara real desde el inicio.
-    
-    // Watchdog para Observabilidad
-    private float lastRealTime = 0f;        //Tiempos de espera para las Activaciones del Botón
-    private float lastSimTime = 0f;
-    private float timeoutThreshold = 2.0f; 
-
-    public Slider zoomSlider; //Para tener el slider del Zoom
-
     void Start()
     {
-        rectTransform = viewportDisplay.GetComponent<RectTransform>();  //Ponemos el Display de las imagenes
-
-        // Suscripción a los flujos de video comprimido (Ahorro de ancho de banda)
-        ROSConnection.GetOrCreateInstance().Subscribe<CompressedImageMsg>("/image_raw/compressed", ProcessRealImage);   //Nos subscribimos a los topicos de las imagenes Reales y Simulacion
+        ROSConnection.GetOrCreateInstance().Subscribe<CompressedImageMsg>("/image_raw/compressed", ProcessRealImage);
+        ROSConnection.GetOrCreateInstance().Subscribe<CompressedImageMsg>("/image_raw/compressed_2", ProcessReal2Image);
         ROSConnection.GetOrCreateInstance().Subscribe<CompressedImageMsg>("/simulated_camera/image_raw/compressed", ProcessSimImage);
         
         textureReal = new Texture2D(1, 1);
+        textureReal2 = new Texture2D(1, 1);
         textureSim = new Texture2D(1, 1);
-        UpdateRotation();
+
+        if (zoomSlider != null) SetZoom(zoomSlider.value);
     }
 
-    private void ProcessRealImage(CompressedImageMsg msg) 
-    { 
-        dataReal = msg.data;                          // Guarda los bytes de la imagen comprimida
-        isRealUpdated = true;                         // Avisa al resto del script que hay una imagen nueva lista para ser procesada y dibujada
-        lastRealTime = Time.time;                     // Guarda el segundo exacto en el que llegó el mensaje.
-        totalBytesInSecond += msg.data.Length;        // Sumamos los bytes para el cálculo de Bitrate
-    }
-
-    private void ProcessSimImage(CompressedImageMsg msg) 
-    { 
-        dataSim = msg.data; 
-        isSimUpdated = true; 
-        lastSimTime = Time.time; 
-        totalBytesInSecond += msg.data.Length;         // Sumamos los bytes para el cálculo de Bitrate
-    }
-    
-
+    private void ProcessRealImage(CompressedImageMsg msg) { dataReal = msg.data; isRealUpdated = true; lastRealTime = Time.time; totalBytesInSecond += msg.data.Length; }
+    private void ProcessReal2Image(CompressedImageMsg msg) { dataReal2 = msg.data; isReal2Updated = true; lastReal2Time = Time.time; totalBytesInSecond += msg.data.Length; }
+    private void ProcessSimImage(CompressedImageMsg msg) { dataSim = msg.data; isSimUpdated = true; lastSimTime = Time.time; totalBytesInSecond += msg.data.Length; }
 
     void Update()
     {
-        // --- GESTIÓN DE MÉTRICAS (Actualización cada 1 segundo) ---
-        if (Time.time >= nextUpdate)
-        {
-            UpdateTelemetryUI();
-            nextUpdate = Time.time + 1.0f;
-            frameCount = 0;
-            totalBytesInSecond = 0;
-        }
+        if (Time.time >= nextUpdate) { UpdateTelemetryUI(); nextUpdate = Time.time + 1.0f; frameCount = 0; totalBytesInSecond = 0; }
 
-        // --- RENDERIZADO Y WATCHDOG ---
-        bool isRealNow = (Time.time - lastRealTime) < timeoutThreshold;
-        bool isSimNow = (Time.time - lastSimTime) < timeoutThreshold;
+        if (mainDisplay == null || secondaryDisplay == null) return;
 
-        if (showingRealCamera && isRealUpdated)
+        if (isRealUpdated || isReal2Updated || isSimUpdated)
         {
-            textureReal.LoadImage(dataReal);
-            textureReal.Apply();
-            viewportDisplay.texture = textureReal;
-            isRealUpdated = false;
-            frameCount++; // Contamos frames para el cálculo de FPS
-        }
-        else if (!showingRealCamera && isSimUpdated)
-        {
-            textureSim.LoadImage(dataSim);
-            textureSim.Apply();
-            viewportDisplay.texture = textureSim;
-            isSimUpdated = false;
+            if (isRealUpdated) { textureReal.LoadImage(dataReal); textureReal.Apply(); isRealUpdated = false; }
+            if (isReal2Updated) { textureReal2.LoadImage(dataReal2); textureReal2.Apply(); isReal2Updated = false; }
+            if (isSimUpdated) { textureSim.LoadImage(dataSim); textureSim.Apply(); isSimUpdated = false; }
+
+            // LÓGICA DE VISUALIZACIÓN CON ROTACIONES FIJAS POR CÁMARA
+            // Cámara 1 (Real): 180º | Cámara 2 (Real2): 270º | Simulación: 0º
+
+            if (modoSimulacionActivo)
+            {
+                // Grande: Simulación (0º) | Pequeña: Móvil 2 (270º)
+                AsignarTexturaYRotacion(mainDisplay, textureSim, 0);
+                AsignarTexturaYRotacion(secondaryDisplay, textureReal2, 270);
+            }
+            else
+            {
+                if (verMovil1EnGrande) {
+                    // Grande: Móvil 1 (180º) | Pequeña: Móvil 2 (270º)
+                    AsignarTexturaYRotacion(mainDisplay, textureReal, 180);
+                    AsignarTexturaYRotacion(secondaryDisplay, textureReal2, 270);
+                } else {
+                    // Grande: Móvil 2 (270º) | Pequeña: Móvil 1 (180º)
+                    AsignarTexturaYRotacion(mainDisplay, textureReal2, 270);
+                    AsignarTexturaYRotacion(secondaryDisplay, textureReal, 180);
+                }
+            }
             frameCount++;
         }
-        
-        UpdateButtonState(isRealNow, isSimNow);
+
+        bool movil1Vivo = (Time.time - lastRealTime) < timeoutThreshold;
+        if (changeButton != null) {
+            changeButton.interactable = movil1Vivo; 
+        }
     }
 
-    void UpdateTelemetryUI()
+    // Función auxiliar para no repetir código y mantener los paneles en su sitio
+    private void AsignarTexturaYRotacion(RawImage display, Texture2D tex, float zRotation)
     {
-        // FPS: Crítico para la seguridad. Según Tema 2.2, baja fluidez = pérdida de control.
-        if (fpsText != null) {
-            fpsText.text = $"FPS: {frameCount}";
-            fpsText.color = frameCount > 15 ? Color.green : Color.red;
-        }
+        display.texture = tex;
+        // Rotamos el RectTransform sobre su propio eje Z. 
+        // Asegúrate en Unity de que el Pivot de la RawImage esté en (0.5, 0.5)
+        display.rectTransform.localRotation = Quaternion.Euler(0, 0, zRotation);
+    }
 
-        // BITRATE: Muestra el consumo de red en KB/s
-        if (bitrateText != null) {
-            float kbps = (totalBytesInSecond / 1024f);
-            bitrateText.text = $"Bitrate: {kbps:F1} KB/s";
-        }
+    public void ToggleModoSimulacion() {
+        modoSimulacionActivo = !modoSimulacionActivo;
+        if (modoSimulacionActivo) verMovil1EnGrande = true;
+    }
 
-        // LATENCIA: Estimada por el tiempo desde el último paquete recibido
+    public void ToggleEntreMovilesReales() {
+        modoSimulacionActivo = false; 
+        verMovil1EnGrande = !verMovil1EnGrande;
+    }
+
+    void UpdateTelemetryUI() {
+        if (fpsText != null) fpsText.text = $"FPS: {frameCount}";
+        if (bitrateText != null) bitrateText.text = $"Bitrate: {(totalBytesInSecond / 1024f):F1} KB/s";
         if (latencyText != null) {
-            float lat = (Time.time - (showingRealCamera ? lastRealTime : lastSimTime)) * 1000;
+            float lastT = modoSimulacionActivo ? lastSimTime : (verMovil1EnGrande ? lastRealTime : lastReal2Time);
+            float lat = (lastT > 0) ? (Time.time - lastT) * 1000 : 0;
             latencyText.text = $"Latency: {lat:F0} ms";
         }
     }
 
-    void UpdateButtonState(bool realAvail, bool simAvail)
-    {
-        if (changeButton == null) return;
-        // Interbloqueo: Solo permite cambiar si hay señal en el otro canal
-        changeButton.interactable = showingRealCamera ? simAvail : realAvail;
-    }
-
-    public void ToggleCamera()
-    {
-        showingRealCamera = !showingRealCamera;
-        UpdateRotation();
-    }
-
-    void UpdateRotation()
-    {
-        if (rectTransform == null) return;
-        // Reindexado: Asegura que la orientación sea natural para el operador (Tema 2.3)
-        rectTransform.localRotation = showingRealCamera ? Quaternion.Euler(0, 0, 180) : Quaternion.Euler(0, 0, 0);
-    }
-    
-    public void SetZoom(float zoomValue)
-    {
-        // 1. Seguridad: Evitamos valores menores a 1 que rompen la vista
+    public void SetZoom(float zoomValue) {
         if (zoomValue < 1f) zoomValue = 1f;
-
-        // 2. Verificamos que la imagen exista antes de tocarla
-        if (viewportDisplay != null)
-        {
+        if (mainDisplay != null) {
             float size = 1.0f / zoomValue;
             float offset = (1.0f - size) / 2.0f;
-
-            // Aplicamos el recorte
-            viewportDisplay.uvRect = new Rect(offset, offset, size, size);
-            Debug.Log($"Zoom aplicado: {zoomValue}x | Size: {size}");
-        }
-        else 
-        {
-            Debug.LogError("¡Error! No has arrastrado la RawImage al script de la cámara.");
+            mainDisplay.uvRect = new Rect(offset, offset, size, size);
         }
     }
 }
