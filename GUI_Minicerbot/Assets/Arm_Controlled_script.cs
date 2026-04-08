@@ -12,15 +12,15 @@ public class ArmControlROS : MonoBehaviour
     public Slider armSlider;
     public string jointElevacion = "2J1"; 
 
-    [Header("Referencias UI - Giro (Desatornillador)")]
-    public string jointGiro = "2J2";
-    public float velocidadGiro = 1.0f; // Velocidad a la que desatornilla
+    [Header("Referencias UI - Giro (Herramienta)")]
+    public string jointGiro = "2J2"; 
+    public float velocidadGiro = 5.0f; // Aumentamos la velocidad para que sea visible
+    
     private bool estaGirando = false;
     private float anguloActual = 0f;
 
     void Start()
     {
-        // Registro del publicador (solo hace falta una vez para el tópico)
         ROSConnection.GetOrCreateInstance().RegisterPublisher<JointStateMsg>(topicName);
 
         if (armSlider != null)
@@ -31,39 +31,48 @@ public class ArmControlROS : MonoBehaviour
 
     void Update()
     {
-        // Si el modo desatornillar está activo, incrementamos el ángulo y publicamos
         if (estaGirando)
         {
-            // Calculamos el nuevo ángulo según el tiempo para que el giro sea fluido
             anguloActual += velocidadGiro * Time.deltaTime;
-            PublicarEstadoBrazo(armSlider != null ? armSlider.value : 0f, anguloActual);
+            
+            // Si el slider no está conectado, que al menos no envíe 0
+            float alturaSegura = 0f;
+            if (armSlider != null) {
+                alturaSegura = armSlider.value;
+            } else {
+                // Si no hay slider, podrías poner aquí el valor por defecto 
+                // para que el brazo no se caiga, por ejemplo: alturaSegura = 0.5f;
+                Debug.LogWarning("¡Pau, conecta el Slider en el Inspector!");
+            }
+
+            PublicarEstadoBrazo(alturaSegura, anguloActual);
         }
     }
 
-    // Llama al botón circular "Rotate Tool"
     public void ToggleGiro()
     {
         estaGirando = !estaGirando;
-        Debug.Log(estaGirando ? "Desatornillando..." : "Giro parado.");
+        Debug.Log(estaGirando ? "Girando herramienta..." : "Detenido.");
     }
 
     public void OnSliderChanged(float value)
     {
-        // Cuando movemos el slider, enviamos la posición del slider y el ángulo de giro actual
-        PublicarEstadoBrazo(value, anguloActual);
+        // Solo publicamos el cambio del slider si NO está girando para no mezclar mensajes
+        if (!estaGirando)
+        {
+            PublicarEstadoBrazo(value, anguloActual);
+        }
     }
 
-    // Función auxiliar para enviar ambos joints a la vez (Formato estándar ROS)
     private void PublicarEstadoBrazo(float posElevacion, float posGiro)
     {
         JointStateMsg msg = new JointStateMsg();
-        
-        // Enviamos los nombres de ambos joints
         msg.name = new string[] { jointElevacion, jointGiro };
         
-        // Enviamos las posiciones de ambos
+        // IMPORTANTE: Aseguramos que pasamos los valores como double
         msg.position = new double[] { (double)posElevacion, (double)posGiro };
         
+        // Dejamos el resto en cero
         msg.velocity = new double[] { 0.0, 0.0 };
         msg.effort = new double[] { 0.0, 0.0 };
 
