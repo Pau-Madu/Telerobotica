@@ -2662,7 +2662,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   topicName: /joint_states_simulation
-  armSlider: {fileID: 0}
+  armSlider: {fileID: 1055164655}
   jointElevacion: 2J1
   jointGiro: 2J2
   velocidadGiro: 1
