@@ -9,22 +9,23 @@ public class ArmControlROS : MonoBehaviour
     [Header("Configuración ROS")]
     public string topicName = "/joint_states"; 
     
-    [Header("Articulación 1: Elevación (Slider)")]
+    [Header("Articulación 1: Elevación (2J1)")]
     public Slider armSlider;
     public string jointElevacion = "2J1"; 
 
-    [Header("Articulación 2: Giro (Botón)")]
+    [Header("Articulación 2: Giro (2J2)")]
     public string jointGiro = "2J2"; 
-    public float posicionActualGiro = 0f;
-    public float velocidadGiroConstante = 5000f; // El valor de tu foto
-    public float minGiro = -20000f;
-    public float maxGiro = 20000f;
     
-    private int direccionGiro = 0; // -1, 0, 1
+    [Tooltip("Escribe aquí la posición exacta para 2J2")]
+    public float posicionManual2J2 = 0f; 
+    
+    public float velocidadGiroConstante = 5000f; 
+    
+    private bool estaGirandoActivamente = false;
+    private float ultimaPosManualEnviada = -1f;
 
     void Start()
     {
-        // Registramos el publicador (se comparte el tópico pero mandaremos mensajes distintos)
         ROSConnection.GetOrCreateInstance().RegisterPublisher<JointStateMsg>(topicName);
 
         if (armSlider != null)
@@ -35,63 +36,61 @@ public class ArmControlROS : MonoBehaviour
 
     void Update()
     {
-        // Si el giro está activo, publicamos constantemente la rotación
-        if (direccionGiro != 0)
+        // 1. CONTROL MANUAL POR VARIABLE PÚBLICA (2J2)
+        // Si el usuario cambia la variable en el Inspector, actualizamos la posición
+        if (!Mathf.Approximately(posicionManual2J2, ultimaPosManualEnviada))
         {
-            posicionActualGiro += direccionGiro * velocidadGiroConstante * Time.deltaTime;
-            posicionActualGiro = Mathf.Clamp(posicionActualGiro, minGiro, maxGiro);
-            PublicarSoloGiro();
+            estaGirandoActivamente = false; // Paramos el giro automático si metemos posición a mano
+            PublicarSoloGiro(posicionManual2J2, 0.0); // Enviamos posición manual con velocidad 0
+            ultimaPosManualEnviada = posicionManual2J2;
+        }
+
+        // 2. LÓGICA DEL GIRO AUTOMÁTICO (Botón)
+        if (estaGirandoActivamente)
+        {
+            posicionManual2J2 += 1 * velocidadGiroConstante * Time.deltaTime;
+            // Actualizamos la variable de control para que no detecte "cambio manual"
+            ultimaPosManualEnviada = posicionManual2J2; 
+            
+            PublicarSoloGiro(posicionManual2J2, 200.0);
+        }
+        else if (!estaGirandoActivamente)
+        {
+            // Enviamos constantemente la posición manual para mantener el motor bloqueado ahí
+            PublicarSoloGiro(posicionManual2J2, 0.0);
         }
     }
 
-    // --- MÉTODOS DE PUBLICACIÓN SEPARADOS ---
-
-    // 1. PUBLICADOR SOLO PARA EL SLIDER (2J1)
     public void PublicarSoloElevacion()
     {
         JointStateMsg msg = new JointStateMsg();
         msg.header = CreateHeader();
-        
         msg.name = new string[] { jointElevacion };
         msg.position = new double[] { (double)armSlider.value };
         msg.velocity = new double[] { 0.0 };
-
         ROSConnection.GetOrCreateInstance().Publish(topicName, msg);
     }
 
-    // 2. PUBLICADOR SOLO PARA EL GIRO (2J2)
-    public void PublicarSoloGiro()
+    public void PublicarSoloGiro(float pos, double vel)
     {
         JointStateMsg msg = new JointStateMsg();
         msg.header = CreateHeader();
-
         msg.name = new string[] { jointGiro };
-        msg.position = new double[] { (double)posicionActualGiro };
-        
-        // Lógica de velocidad de tu foto: 0 si parado, 200 si gira
-        double velEnvio = (direccionGiro == 0) ? 0.0 : 200.0;
-        msg.velocity = new double[] { velEnvio };
+        msg.position = new double[] { (double)pos };
+        msg.velocity = new double[] { vel };
 
         ROSConnection.GetOrCreateInstance().Publish(topicName, msg);
     }
 
-    // --- CONTROL DEL BOTÓN ---
     public void ToggleGiro()
     {
-        if (direccionGiro == 0) direccionGiro = 1;
-        else {
-            direccionGiro = 0;
-            PublicarSoloGiro(); // Mandamos un último mensaje para asegurar la parada
-        }
-        Debug.Log(direccionGiro != 0 ? "Giro 2J2 activado" : "Giro 2J2 parado");
+        estaGirandoActivamente = !estaGirandoActivamente;
     }
 
-    // Función auxiliar para el Header de ROS2
     private HeaderMsg CreateHeader()
     {
         HeaderMsg header = new HeaderMsg();
         header.frame_id = "base_link";
-        // Si tu versión soporta GetTime(), añádela aquí. Si no, déjalo así.
         return header;
     }
 }
