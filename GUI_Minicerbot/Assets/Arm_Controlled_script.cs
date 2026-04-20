@@ -19,7 +19,7 @@ public class ArmControlROS : MonoBehaviour
     [Tooltip("Escribe aquí la posición exacta para 2J2")]
     public float posicionManual2J2 = 0f; 
     
-    public float velocidadGiroConstante = 5000f; 
+    public float velocidadGiroConstante = 200f; // Velocidad constante para el giro automático
     
     private bool estaGirandoActivamente = false;
     private float ultimaPosManualEnviada = -1f;
@@ -48,7 +48,7 @@ public class ArmControlROS : MonoBehaviour
         // 2. LÓGICA DEL GIRO AUTOMÁTICO (Botón)
         if (estaGirandoActivamente)
         {
-            posicionManual2J2 += 1 * velocidadGiroConstante * Time.deltaTime;
+            posicionManual2J2 += 1 * velocidadGiroConstante * Time.deltaTime; // Cambiar signo = cambiar sentido de giro
             // Actualizamos la variable de control para que no detecte "cambio manual"
             ultimaPosManualEnviada = posicionManual2J2; 
             
@@ -94,3 +94,9 @@ public class ArmControlROS : MonoBehaviour
         return header;
     }
 }
+
+
+
+// Para MOVER el INTERRUPTOR se ha puesto la herramienta totalmente en Horizontal y la posicion de Giro = 0.
+// A continuación se ha cambiado el valor de Giro a 400 para que encaje con el botón.
+// Finalmente se ha ajustado la velocidad de giro a -400 para que la herramienta gire hacia la Izquierda y active el interruptor.
