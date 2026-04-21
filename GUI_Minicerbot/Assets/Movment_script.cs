@@ -25,61 +25,61 @@ public class RosTeleopDualControl : MonoBehaviour
         ros.RegisterPublisher<TwistMsg>(topicName);
     }
 
-void Update()
+    void Update()
     {
-        // 1. AJUSTE DE VELOCIDAD CON GATILLOS (R1 aumenta, L1 disminuye)
-        // Usamos GetKeyDown o una pulsación mantenida suave
-        if (Input.GetKey(KeyCode.JoystickButton5) || Input.GetKey(KeyCode.E)) // R1 Augmenta la velocidad
+        // 1. AJUSTE DE VELOCIDAD CON GATILLOS
+        if (Input.GetKey(KeyCode.JoystickButton5) || Input.GetKey(KeyCode.E)) 
         {
             currentLinearSpeed = Mathf.Clamp(currentLinearSpeed + 0.01f, 0, maxLinearLimit);
         }
-        if (Input.GetKey(KeyCode.JoystickButton4) || Input.GetKey(KeyCode.Q)) // L1 Disminuye la velocidad
+        if (Input.GetKey(KeyCode.JoystickButton4) || Input.GetKey(KeyCode.Q)) 
         {
             currentLinearSpeed = Mathf.Clamp(currentLinearSpeed - 0.01f, 0, maxLinearLimit);
         }
 
-
-        // 2. LECTURA DE ENTRADAS (Joystick y Teclado)
-        float move = 0f;
+        // 2. LECTURA DE ENTRADAS
+        float moveX = 0f;
+        float moveY = 0f; // Para el desplazamiento lateral de las flechas
         float turn = 0f;
 
-        // Lectura de Joysticks analógicos
+        // Lectura de Joysticks (Mantenemos tu lógica original)
         float joyVertical = Input.GetAxis("Vertical");
         float joyHorizontal = Input.GetAxis("Horizontal");
 
-        // --- MOVIMIENTO TECLADO (WASD normal / Flechas PRECISIÓN) ---
-        if (Input.GetKey(KeyCode.W)) move = 1f;
-        else if (Input.GetKey(KeyCode.S)) move = -1f;
+        // --- MOVIMIENTO TECLADO WASD (Rotación normal) ---
+        if (Input.GetKey(KeyCode.W)) moveX = 1f;
+        else if (Input.GetKey(KeyCode.S)) moveX = -1f;
         
         if (Input.GetKey(KeyCode.A)) turn = 1f;
         else if (Input.GetKey(KeyCode.D)) turn = -1f;
 
-        // --- MODO PRECISIÓN PC (Flechas van al 20% de la velocidad actual) ---
-        if (Input.GetKey(KeyCode.UpArrow)) move = 0.2f;
-        else if (Input.GetKey(KeyCode.DownArrow)) move = -0.2f;
+        // --- AJUSTE FINO CON FLECHAS (Movimiento Lateral como Raúl) ---
+        if (Input.GetKey(KeyCode.UpArrow)) moveX = 0.2f;
+        else if (Input.GetKey(KeyCode.DownArrow)) moveX = -0.2f;
         
-        if (Input.GetKey(KeyCode.LeftArrow)) turn = 0.2f;
-        else if (Input.GetKey(KeyCode.RightArrow)) turn = -0.2f;
+        // Aquí está el cambio: Las flechas no afectan a 'turn', sino a 'moveY'
+        if (Input.GetKey(KeyCode.LeftArrow)) moveY = 0.2f;
+        else if (Input.GetKey(KeyCode.RightArrow)) moveY = -0.2f;
 
-        // Si no hay teclado, usamos el Joystick
-        if (move == 0) move = joyVertical;
-        if (turn == 0) turn = -joyHorizontal;
+        // Prioridad: Si no se usan las flechas para el lateral, el joystick controla el giro
+        if (moveX == 0 && moveY == 0) moveX = joyVertical;
+        
+        // Mantenemos tu giro original del joystick:
+        if (turn == 0 && moveY == 0) turn = -joyHorizontal; 
 
-        // 3. BOTONES DE ACCIÓN DEL MANDO (Cámaras)
-        // Botón X (Cruz) -> Intercambio de móviles reales
+        // 3. BOTONES DE ACCIÓN DEL MANDO
         if (Input.GetKeyDown(KeyCode.JoystickButton0)) 
         {
             if (cameraScript != null) cameraScript.ToggleEntreMovilesReales();
         }
-
-        // Botón Cuadrado -> Cambio a Simulación
         if (Input.GetKeyDown(KeyCode.JoystickButton2))
         {
             if (cameraScript != null) cameraScript.ToggleModoSimulacion();
         }
 
         // 4. CÁLCULO FINAL
-        float finalForward = move * currentLinearSpeed;
+        float finalForward = moveX * currentLinearSpeed;
+        float finalStrafe = moveY * currentLinearSpeed;
         float finalTurn = turn * currentAngularSpeed;
 
         // 5. MOVIMIENTO DE REFERENCIA (Unity)
@@ -87,13 +87,17 @@ void Update()
         {
             float dt = Time.deltaTime;
             robotReferencia.Rotate(0, -finalTurn * Mathf.Rad2Deg * dt, 0);
-            robotReferencia.Translate(Vector3.forward * finalForward * dt);
+            // Movimiento local combinado (X adelante, Z lateral en Unity)
+            Vector3 movimientoLocal = new Vector3(finalStrafe, 0, finalForward);
+            robotReferencia.Translate(movimientoLocal * dt);
         }
 
         // 6. PUBLICAR A ROS
         TwistMsg cmdVel = new TwistMsg();
         cmdVel.linear.x = finalForward;
-        cmdVel.angular.z = finalTurn;
+        cmdVel.linear.y = finalStrafe; // Envío lateral para ajuste fino
+        cmdVel.angular.z = finalTurn;  // Giro controlado por WASD o Joystick
+        
         ros.Publish(topicName, cmdVel);
     }
 }
