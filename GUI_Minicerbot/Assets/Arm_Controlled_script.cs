@@ -36,8 +36,7 @@ public class ArmControlROS : MonoBehaviour
 
     void Update()
     {
-        // 1. CONTROL MANUAL POR VARIABLE PÚBLICA (2J2)
-        // Si el usuario cambia la variable en el Inspector, actualizamos la posición
+        // 1. CONTROL MANUAL POR VARIABLE PÚBLICA del 2J2
         if (!Mathf.Approximately(posicionManual2J2, ultimaPosManualEnviada))
         {
             estaGirandoActivamente = false; // Paramos el giro automático si metemos posición a mano
@@ -56,8 +55,7 @@ public class ArmControlROS : MonoBehaviour
         }
         else if (!estaGirandoActivamente)
         {
-            // Enviamos constantemente la posición manual para mantener el motor bloqueado ahí
-            PublicarSoloGiro(posicionManual2J2, 0.0);
+            PublicarSoloGiro(posicionManual2J2, 0.0); // Enviamos constantemente la posición manual para mantener el motor bloqueado ahí
         }
     }
 
@@ -94,9 +92,3 @@ public class ArmControlROS : MonoBehaviour
         return header;
     }
 }
-
-
-
-// Para MOVER el INTERRUPTOR se ha puesto la herramienta totalmente en Horizontal y la posicion de Giro = 0.
-// A continuación se ha cambiado el valor de Giro a 400 para que encaje con el botón.
-// Finalmente se ha ajustado la velocidad de giro a -400 para que la herramienta gire hacia la Izquierda y active el interruptor.

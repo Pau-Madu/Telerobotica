@@ -62,7 +62,7 @@ public class Camera_script : MonoBehaviour
             if (isReal2Updated) { textureReal2.LoadImage(dataReal2); textureReal2.Apply(); isReal2Updated = false; }
             if (isSimUpdated) { textureSim.LoadImage(dataSim); textureSim.Apply(); isSimUpdated = false; }
 
-            // LÓGICA DE VISUALIZACIÓN CON ROTACIONES FIJAS POR CÁMARA
+            // LÓGICA DE VISUALIZACIÓN CON ROTACIONES EN CADA CÁMARA
             // Cámara 1 (Real): 180º | Cámara 2 (Real2): 270º | Simulación: 0º
 
             if (modoSimulacionActivo)

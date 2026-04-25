@@ -35,9 +35,8 @@ public class RosbagControl : MonoBehaviour
             ProcessStartInfo psi = new ProcessStartInfo {
                 FileName = "/bin/bash",
                 Arguments = $"-c \"{command}\"",
-                UseShellExecute = false,
-                // IMPORTANTE: Ponemos estas en FALSE para evitar que Unity se quede esperando respuesta
-                RedirectStandardError = false, 
+                UseShellExecute = false, 
+                RedirectStandardError = false,  //Evita que Unity se quede esperando respuesta
                 RedirectStandardOutput = false,
                 CreateNoWindow = true
             };
@@ -57,7 +56,6 @@ public class RosbagControl : MonoBehaviour
     {
         if (isRecording)
         {
-            // Enviamos la señal 2 (SIGINT/Ctrl+C) al proceso de ros2 bag
             string killCommand = "pkill -2 -f 'ros2 bag record'";
         
             ProcessStartInfo killPsi = new ProcessStartInfo {
@@ -81,7 +79,7 @@ public class RosbagControl : MonoBehaviour
         if (rosbagButton != null) rosbagButton.image.color = isRecording ? Color.red : Color.white;
     }
 
-    // Seguridad: Si cierras Unity, que se detenga el rosbag para no dejar procesos basura
+    // Seguridad: Si cierras Unity, que se detenga el rosbag
     void OnApplicationQuit() {
         if (isRecording) StopRecording();
     }

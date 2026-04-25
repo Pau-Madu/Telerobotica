@@ -7,8 +7,8 @@ public class ButtonPublisher : MonoBehaviour
 {
     public ROSConnection ros;
     public string topicName = "/button_detector";
-    private Button button;             // Referencia al botón
-    private Text buttonText;           // Referencia al texto del botón
+    private Button button;     // Referencia al botón
+    private Text buttonText;   // Referencia al texto del botón
 
     void Start()
     {
@@ -25,12 +25,6 @@ public class ButtonPublisher : MonoBehaviour
             return;
         }
 
-        // Cambiar el texto del botón
-        buttonText = button.GetComponentInChildren<Text>();
-        if (buttonText != null)
-        {
-            buttonText.text = "Button Detector";
-        }
 
         // Posicionar el botón en la esquina inferior izquierda
         RectTransform rt = button.GetComponent<RectTransform>();
