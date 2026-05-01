@@ -17,7 +17,7 @@ public class RosTeleopDualControl : MonoBehaviour
 
     [Header("Referencias")]
     public Camera_script cameraScript; 
-    public Transform robotReferencia; 
+    // public Transform robotReferencia; 
 
     void Start()
     {
@@ -80,13 +80,14 @@ public class RosTeleopDualControl : MonoBehaviour
         float finalTurn = turn * currentAngularSpeed;
 
         // 5. MOVIMIENTO DE REFERENCIA
-        if (robotReferencia != null)
+        /*if (robotReferencia != null)  // Intento fallido de mover el robot en Unity para visualizar el movimiento y mejorar la LATENCIA, pero no es necesario para el control real
         {
             float dt = Time.deltaTime;
             robotReferencia.Rotate(0, -finalTurn * Mathf.Rad2Deg * dt, 0);
             Vector3 movimientoLocal = new Vector3(finalStrafe, 0, finalForward);
             robotReferencia.Translate(movimientoLocal * dt);
         }
+        */
 
         // 6. PUBLICAR A ROS
         TwistMsg cmdVel = new TwistMsg();
