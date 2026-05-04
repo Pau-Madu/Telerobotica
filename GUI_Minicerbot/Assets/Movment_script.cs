@@ -28,11 +28,11 @@ public class RosTeleopDualControl : MonoBehaviour
     void Update()
     {
         // 1. AJUSTE DE VELOCIDAD CON GATILLOS DEL MANDO
-        if (Input.GetKey(KeyCode.JoystickButton5) || Input.GetKey(KeyCode.E)) 
+        if (Input.GetKey(KeyCode.JoystickButton5)) 
         {
             currentLinearSpeed = Mathf.Clamp(currentLinearSpeed + 0.01f, 0, maxLinearLimit);
         }
-        if (Input.GetKey(KeyCode.JoystickButton4) || Input.GetKey(KeyCode.Q)) 
+        if (Input.GetKey(KeyCode.JoystickButton4)) 
         {
             currentLinearSpeed = Mathf.Clamp(currentLinearSpeed - 0.01f, 0, maxLinearLimit);
         }
